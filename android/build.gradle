@@ -1,3 +1,22 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// Provide a 'flutter' ext map that plugin sub-projects (e.g. flutter_blue_plus_android)
+// reference as flutter.compileSdkVersion before the Flutter plugin initializes it.
+// Subprojects inherit from the root project's ext.
+ext {
+    flutter = [
+        compileSdkVersion: 34,
+        minSdkVersion    : 21,
+        targetSdkVersion : 34,
+        ndkVersion       : "25.1.8937393"
+    ]
+}
+
 allprojects {
     repositories {
         google()
