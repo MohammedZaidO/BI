@@ -1,0 +1,24 @@
+name: classroom_silent_mode
+description: A Flutter app that automatically puts phone on silent when connected to ESP32 classroom device
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_blue_plus: ^1.36.0
+  permission_handler: ^11.3.0
+  shared_preferences: ^2.2.2
+  flutter_contacts: ^1.1.7
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
