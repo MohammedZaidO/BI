@@ -13,15 +13,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Fix for plugin sub-projects (e.g. flutter_blue_plus_android) that reference
-// flutter.compileSdkVersion before the Flutter extension is available.
-// This hook runs exactly when the android library plugin is applied — no timing issues.
-subprojects { proj ->
-    proj.plugins.withId("com.android.library") {
-        proj.android.compileSdkVersion 34
-    }
-}
-
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
