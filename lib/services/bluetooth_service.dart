@@ -41,7 +41,7 @@ class BluetoothService {
             await FlutterBluePlus.stopScan();
             
             try {
-              await _device!.connect(timeout: const Duration(seconds: 10));
+              await _device!.connect(timeout: const Duration(seconds: 10), license: null);
               _isConnected = true;
               onConnectionChanged?.call(true);
               
