@@ -28,11 +28,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Setup local.properties (CI Fix)
-        run: |
-          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
-
       - name: Build APK (Release)
         run: flutter build apk --release
 
