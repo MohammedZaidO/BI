@@ -13,6 +13,20 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Force compileSdkVersion for all plugin sub-projects
+// (fixes flutter_blue_plus and similar plugins that reference flutter.compileSdkVersion)
+subprojects {
+    afterEvaluate {
+        if (it.hasProperty("android")) {
+            it.android {
+                if (compileSdkVersion < 34) {
+                    compileSdkVersion 34
+                }
+            }
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
