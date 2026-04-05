@@ -13,17 +13,12 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Force compileSdkVersion for all plugin sub-projects
-// (fixes flutter_blue_plus and similar plugins that reference flutter.compileSdkVersion)
-subprojects {
-    afterEvaluate {
-        if (it.hasProperty("android")) {
-            it.android {
-                if (compileSdkVersion < 34) {
-                    compileSdkVersion 34
-                }
-            }
-        }
+// Fix for plugin sub-projects (e.g. flutter_blue_plus_android) that reference
+// flutter.compileSdkVersion before the Flutter extension is available.
+// This hook runs exactly when the android library plugin is applied — no timing issues.
+subprojects { proj ->
+    proj.plugins.withId("com.android.library") {
+        proj.android.compileSdkVersion 34
     }
 }
 
