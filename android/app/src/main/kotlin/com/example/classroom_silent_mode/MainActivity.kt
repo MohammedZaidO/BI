@@ -169,10 +169,19 @@ class MainActivity: FlutterActivity() {
         
         try {
             originalRingerMode = audioManager.ringerMode
-            audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+            
+            // CRITICAL: Set base state to VIBRATE.
+            // This ensures the hardware's "initial command" is Vibrate.
+            audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                notificationManager.notificationPolicy = Policy(0, Policy.PRIORITY_SENDERS_STARRED, Policy.PRIORITY_SENDERS_STARRED)
+                // Configure DND to allow ONLY Starred Contacts.
+                // This will block vibration for all non-favourites natively.
+                val categories = Policy.PRIORITY_CATEGORY_CALLS
+                val callSenders = Policy.PRIORITY_SENDERS_STARRED
+                val msgSenders = Policy.PRIORITY_SENDERS_STARRED
+                notificationManager.notificationPolicy = Policy(categories, callSenders, msgSenders)
+                
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
             isClassroomModeGlobal = true
