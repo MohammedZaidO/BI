@@ -53,14 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       
       if (connected) {
-        // Prefer Priority DND (allows emergency/starred callers) instead of ringer-silent.
-        PhoneService.ensureDndAccess().then((granted) {
-          if (granted) {
-            PhoneService.enableClassroomMode();
-          }
-          _checkSilentMode();
+        // Request essential permissions for Mode Shifting logic
+        [Permission.phone, Permission.callLog].request().then((_) {
+          PhoneService.ensureDndAccess().then((granted) {
+            if (granted) {
+              PhoneService.enableClassroomMode();
+            }
+            _checkSilentMode();
+          });
         });
-        _showNotification('Connected to Classroom1', 'Classroom mode enabled (Priority DND)');
+        _showNotification('Connected to Classroom1', 'Classroom mode enabled (Force-Toggle)');
       } else {
         PhoneService.disableClassroomMode();
         _checkSilentMode();

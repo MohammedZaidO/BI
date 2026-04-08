@@ -30,10 +30,89 @@ class MainActivity: FlutterActivity() {
         var isClassroomModeGlobal = false
     }
 
+    private val callReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!isClassroomModeGlobal) return
+
+            if (intent.action == TelephonyManager.ACTION_PHONE_STATE_CHANGED) {
+                val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
+                var incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
+                
+                // FALLBACK: If number is null (Android 11+), try to peek at CallLog
+                if (state == TelephonyManager.EXTRA_STATE_RINGING && incomingNumber.isNullOrEmpty()) {
+                    incomingNumber = getMostRecentIncomingNumber(context)
+                }
+
+                if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+                    if (isNumberInFavourites(context, incomingNumber)) {
+                        // FORCE TOGGLE to Vibrate for Favourite
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                    } else {
+                        // FORCE TOGGLE to Silent for everyone else
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                    }
+                } else if (state == TelephonyManager.EXTRA_STATE_IDLE || state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
+                    // Reset to Classroom Default (Silent) when call ends or is answered
+                    if (isClassroomModeGlobal) {
+                        audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                    }
+                }
+            }
+        }
+    }
+
+    private fun getMostRecentIncomingNumber(context: Context): String? {
+        try {
+            val cursor = context.contentResolver.query(
+                android.provider.CallLog.Calls.CONTENT_URI,
+                arrayOf(android.provider.CallLog.Calls.NUMBER),
+                null, null,
+                android.provider.CallLog.Calls.DATE + " DESC LIMIT 1"
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    return it.getString(0)
+                }
+            }
+        } catch (e: Exception) { }
+        return null
+    }
+
+    private fun isNumberInFavourites(context: Context, incomingNumber: String?): Boolean {
+        if (incomingNumber.isNullOrEmpty()) return false
+        
+        val sharedPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val jsonStr = sharedPrefs.getString("flutter.emergency_contacts", "[]") ?: "[]"
+        
+        val incClean = incomingNumber.replace(Regex("\\D"), "")
+        try {
+            val arr = org.json.JSONArray(jsonStr)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val savedNum = obj.getString("phoneNumber").replace(Regex("\\D"), "")
+                if (savedNum.isNotEmpty() && (incClean.endsWith(savedNum) || savedNum.endsWith(incClean))) {
+                    return true
+                }
+            }
+        } catch (e: Exception) { }
+        return false
+    }
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
+        // Register Receiver with High Priority
+        try {
+            val filter = IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
+            filter.priority = Int.MAX_VALUE
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(callReceiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(callReceiver, filter)
+            }
+        } catch (e: Exception) { }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "ensureDndAccess" -> result.success(ensureDndAccess())
@@ -60,22 +139,14 @@ class MainActivity: FlutterActivity() {
         if (!nm.isNotificationPolicyAccessGranted) return false
         
         try {
-            // Save current mode to restore later
             originalRingerMode = audioManager.ringerMode
             
-            // Set Ringer to NORMAL/VIBRATE so priority calls CAN ring.
-            // (System DND will still keep regular calls 100% silent)
-            audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
+            // Classroom Default: SILENT
+            audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Configure Policy: Allow ONLY calls from Starred Contacts.
-                // Repeat callers, messages, etc. - all BLOCKED.
-                val categories = Policy.PRIORITY_CATEGORY_CALLS
-                val callSenders = Policy.PRIORITY_SENDERS_STARRED
-                val msgSenders = Policy.PRIORITY_SENDERS_STARRED
-                nm.notificationPolicy = Policy(categories, callSenders, msgSenders)
-                
-                // Switch to Priority Mode
+                // Set DND to allow nothing (we handle the favourties via Force Toggle)
+                nm.notificationPolicy = Policy(0, Policy.PRIORITY_SENDERS_NONE, Policy.PRIORITY_SENDERS_NONE)
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
             isClassroomModeGlobal = true
