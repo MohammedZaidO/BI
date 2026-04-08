@@ -146,7 +146,7 @@ class MainActivity: FlutterActivity() {
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 // Set DND to allow nothing (we handle the favourties via Force Toggle)
-                nm.notificationPolicy = Policy(0, Policy.PRIORITY_SENDERS_NONE, Policy.PRIORITY_SENDERS_NONE)
+                nm.notificationPolicy = Policy(0, Policy.PRIORITY_SENDERS_STARRED, Policy.PRIORITY_SENDERS_STARRED)
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
             isClassroomModeGlobal = true
