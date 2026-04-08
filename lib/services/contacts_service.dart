@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 class EmergencyContact {
   final String id;
@@ -77,5 +78,31 @@ class ContactsService {
     return contacts.any((contact) => 
       contact.phoneNumber.replaceAll(RegExp(r'[^\d]'), '') == 
       phoneNumber.replaceAll(RegExp(r'[^\d]'), ''));
+  }
+
+  /// Synchronizes all app emergency contacts with the system's 'Starred' contacts.
+  /// This ensures that the DND Priority model correctly identifies emergency callers.
+  static Future<void> syncAllToSystem() async {
+    try {
+      final appContacts = await getEmergencyContacts();
+      final sysContacts = await FlutterContacts.getContacts(withProperties: true);
+      
+      for (var appC in appContacts) {
+        final cleanAppPhone = appC.phoneNumber.replaceAll(RegExp(r'\D'), '');
+        
+        for (var sysC in sysContacts) {
+          bool matches = sysC.phones.any((p) => 
+              p.number.replaceAll(RegExp(r'\D'), '').endsWith(cleanAppPhone) || 
+              cleanAppPhone.endsWith(p.number.replaceAll(RegExp(r'\D'), '')));
+              
+          if (matches && !sysC.isStarred) {
+            sysC.isStarred = true;
+            await FlutterContacts.updateContact(sysC);
+          }
+        }
+      }
+    } catch (e) {
+      print('Sync failed: $e');
+    }
   }
 }

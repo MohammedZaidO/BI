@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _checkSilentMode();
     _loadEsp32MacAddress();
     _loadContacts();
+    ContactsService.syncAllToSystem();
   }
   
   void _loadContacts() async {
