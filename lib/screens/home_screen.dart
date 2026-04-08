@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (connected) {
         // Request essential permissions for Mode Shifting logic
-        [Permission.phone, Permission.callLog].request().then((_) {
+        [Permission.phone].request().then((_) {
           PhoneService.ensureDndAccess().then((granted) {
             if (granted) {
               PhoneService.enableClassroomMode();
