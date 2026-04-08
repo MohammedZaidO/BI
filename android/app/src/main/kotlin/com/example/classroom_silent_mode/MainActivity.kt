@@ -24,6 +24,8 @@ import android.telephony.TelephonyManager
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "phone_service"
     private lateinit var audioManager: AudioManager
+    private lateinit var notificationManager: NotificationManager
+    private var vibrator: Vibrator? = null
     private var originalRingerMode: Int = -1
 
     companion object {
@@ -38,27 +40,56 @@ class MainActivity: FlutterActivity() {
                 val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
                 var incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
                 
-                // FALLBACK: If number is null (Android 11+), try to peek at CallLog
-                if (state == TelephonyManager.EXTRA_STATE_RINGING && incomingNumber.isNullOrEmpty()) {
-                    incomingNumber = getMostRecentIncomingNumber(context)
-                }
-
                 if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+                    // Fallback to CallLog if intent number is null
+                    if (incomingNumber.isNullOrEmpty()) {
+                        incomingNumber = getMostRecentIncomingNumber(context)
+                    }
+
                     if (isNumberInFavourites(context, incomingNumber)) {
-                        // FORCE TOGGLE to Vibrate for Favourite
+                        // FAVOURITE DETECTED: Manual Override
+                        
+                        // 1. Force Ringer to Vibrate
                         audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
-                    } else {
-                        // FORCE TOGGLE to Silent for everyone else
-                        audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                        
+                        // 2. Force DND to ALL (Allow interruptions so motor can run)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+                        }
+                        
+                        // 3. Start manual vibration pulsed pattern
+                        startManualVibration(context)
                     }
                 } else if (state == TelephonyManager.EXTRA_STATE_IDLE || state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
-                    // Reset to Classroom Default (Silent) when call ends or is answered
+                    // Call ended or answered: Restore Classroom Silent Mode
+                    stopManualVibration()
+                    
                     if (isClassroomModeGlobal) {
                         audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private fun startManualVibration(context: Context) {
+        if (vibrator == null) {
+            vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+        val pattern = longArrayOf(0, 1000, 500, 1000, 500) // Distinct pulse
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(pattern, 0)
+        }
+    }
+
+    private fun stopManualVibration() {
+        vibrator?.cancel()
     }
 
     private fun getMostRecentIncomingNumber(context: Context): String? {
@@ -101,8 +132,8 @@ class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
-        // Register Receiver with High Priority
         try {
             val filter = IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
             filter.priority = Int.MAX_VALUE
@@ -125,8 +156,7 @@ class MainActivity: FlutterActivity() {
     }
     
     private fun ensureDndAccess(): Boolean {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (nm.isNotificationPolicyAccessGranted) return true
+        if (notificationManager.isNotificationPolicyAccessGranted) return true
         
         val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -135,19 +165,15 @@ class MainActivity: FlutterActivity() {
     }
     
     private fun enablePriorityDnd(): Boolean {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (!nm.isNotificationPolicyAccessGranted) return false
+        if (!notificationManager.isNotificationPolicyAccessGranted) return false
         
         try {
             originalRingerMode = audioManager.ringerMode
-            
-            // Classroom Default: SILENT
             audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Set DND to allow nothing (we handle the favourties via Force Toggle)
-                nm.notificationPolicy = Policy(0, Policy.PRIORITY_SENDERS_STARRED, Policy.PRIORITY_SENDERS_STARRED)
-                nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                notificationManager.notificationPolicy = Policy(0, Policy.PRIORITY_SENDERS_STARRED, Policy.PRIORITY_SENDERS_STARRED)
+                notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
             isClassroomModeGlobal = true
             return true
@@ -157,14 +183,12 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun disableDnd(): Boolean {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (!nm.isNotificationPolicyAccessGranted) return false
+        if (!notificationManager.isNotificationPolicyAccessGranted) return false
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+            notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
         }
         
-        // Restore ringer mode
         if (originalRingerMode != -1) {
             audioManager.ringerMode = originalRingerMode
         } else {
@@ -172,16 +196,17 @@ class MainActivity: FlutterActivity() {
         }
         
         isClassroomModeGlobal = false
+        stopManualVibration()
         return true
     }
 
     private fun isPriorityDndEnabled(): Boolean {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        return nm.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_PRIORITY
+        return notificationManager.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_PRIORITY
     }
 
     override fun onDestroy() {
         super.onDestroy()
         isClassroomModeGlobal = false
+        stopManualVibration()
     }
 }
