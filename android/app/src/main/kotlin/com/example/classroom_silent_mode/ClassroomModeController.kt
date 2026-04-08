@@ -15,6 +15,13 @@ class ClassroomModeController(private val context: Context) {
 
     companion object {
         var isEnabledGlobal = false
+        private const val PREFS_NAME = "FlutterSharedPreferences"
+        private const val KEY_MODE = "flutter.is_classroom_mode_enabled"
+
+        fun isPersistedEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getBoolean(KEY_MODE, false)
+        }
     }
 
     fun enableClassroomMode(): Boolean {
@@ -24,27 +31,23 @@ class ClassroomModeController(private val context: Context) {
         }
 
         try {
-            // Save current mode to restore later
             originalRingerMode = audioManager.ringerMode
-            
-            // 1. SET RINGER TO VIBRATE (Base State)
-            // This ensures the hardware vibrator is "Ready" for the screening alerts.
             audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
             
-            // 2. SET DND PRIORITY FILTER
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Block EVERYTHING else (no calls, no messages).
-                // Our "Notification Shout" is a separate high-priority event.
-                val categories = 0 // No categories allowed (Silence everyone)
+                val categories = 0 
                 val callSenders = Policy.PRIORITY_SENDERS_STARRED
                 val msgSenders = Policy.PRIORITY_SENDERS_STARRED
                 notificationManager.notificationPolicy = Policy(categories, callSenders, msgSenders)
-                
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
             
+            // Persist State
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putBoolean(KEY_MODE, true).apply()
+            
             isEnabledGlobal = true
-            Log.d(TAG, "CLASSROOM_MODE_ON: Ringer=Vibrate, DND=Priority(Block All)")
+            Log.d(TAG, "CLASSROOM_MODE_PERSISTED: ON")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error enabling Classroom Mode", e)
@@ -56,20 +59,22 @@ class ClassroomModeController(private val context: Context) {
         if (!notificationManager.isNotificationPolicyAccessGranted) return false
         
         try {
-            // 1. Restore DND Filter
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
             }
             
-            // 2. Restore Ringer Mode
             if (originalRingerMode != -1) {
                 audioManager.ringerMode = originalRingerMode
             } else {
                 audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
             }
             
+            // Persist State
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putBoolean(KEY_MODE, false).apply()
+
             isEnabledGlobal = false
-            Log.d(TAG, "CLASSROOM_MODE_OFF: Settings restored.")
+            Log.d(TAG, "CLASSROOM_MODE_PERSISTED: OFF")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error disabling Classroom Mode", e)

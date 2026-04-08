@@ -8,44 +8,44 @@ class CallHandlerService : CallScreeningService() {
     private val TAG = "CallHandlerService"
 
     override fun onScreenCall(callDetails: Call.Details) {
-        val incomingNumber = callDetails.handle?.schemeSpecificPart
+        val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date())
+        val threadName = Thread.currentThread().name
+        val incomingNumber = callDetails.handle?.schemeSpecificPart ?: "UNKNOWN"
         
-        Log.d(TAG, "Screening Call: $incomingNumber (Classroom Mode: ${ClassroomModeController.isEnabledGlobal})")
+        Log.d(TAG, "EVIDENCE: onScreenCall entered | Time: $timestamp | Thread: $threadName")
+        Log.d(TAG, "EVIDENCE: incomingNumberRaw: $incomingNumber")
 
-        // 1. Logic State A: Classroom Mode OFF
-        if (!ClassroomModeController.isEnabledGlobal) {
-            respondToCall(callDetails, CallResponse.Builder().build())
-            return
-        }
-
-        val matcher = EmergencyMatcher(this)
-        val alertEngine = AlertEngine(this)
-        val isEmergency = matcher.isEmergencyMatch(incomingNumber)
+        // READ PERSISTED STATE
+        val isModeEnabled = ClassroomModeController.isPersistedEnabled(this)
+        Log.d(TAG, "EVIDENCE: classroomMode=$isModeEnabled")
 
         val responseBuilder = CallResponse.Builder()
-            .setDisallowCall(false) // Never reject, only silence
-            .setRejectCall(false)
-            .setSkipCallLog(false)
-            .setSkipNotification(false)
 
-        if (isEmergency) {
-            // 2. Logic State C: Emergency Caller
-            Log.d(TAG, "MATCH FOUND: Triggering Emergency Pipeline.")
+        if (isModeEnabled) {
+            // DEBUG BRANCH: FORCE SILENCE EVERYTHING TO PROVE PIPELINE
+            Log.d(TAG, "EVIDENCE: debugSilenceAllCallsInClassroom=true")
             
-            // Native Silence (to remove ringtone sound)
-            responseBuilder.setSilenceCall(true)
-            
-            // Trigger Fresh Event Notification & BLE Fallback
-            alertEngine.triggerEmergencyAlert(incomingNumber)
+            responseBuilder
+                .setDisallowCall(false) // Not blocking, just silencing
+                .setRejectCall(false)
+                .setSkipCallLog(false)
+                .setSkipNotification(false)
+                .setSilenceCall(true)
         } else {
-            // 3. Logic State B: Non-Emergency Caller
-            Log.d(TAG, "NO MATCH: Maintaining Silence.")
-            
-            // Native Silence (no ringtone, no native vibration)
-            responseBuilder.setSilenceCall(true)
+            // NORMAL BRANCH: PASS THROUGH
+            Log.d(TAG, "EVIDENCE: debugSilenceAllCallsInClassroom=false (Mode is OFF)")
+            responseBuilder
+                .setDisallowCall(false)
+                .setRejectCall(false)
+                .setSkipCallLog(false)
+                .setSkipNotification(false)
+                .setSilenceCall(false)
         }
 
-        // Respond within 5s
-        respondToCall(callDetails, responseBuilder.build())
+        val response = responseBuilder.build()
+        Log.d(TAG, "EVIDENCE: response flags disallow=${response.shouldDisallowCall} reject=${response.shouldRejectCall} skipLog=${response.shouldSkipCallLog} skipNotification=${response.shouldSkipNotification} silence=${response.shouldSilenceCall}")
+        
+        Log.d(TAG, "EVIDENCE: respondToCall executed")
+        respondToCall(callDetails, response)
     }
 }
