@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class BluetoothService {
   static const String deviceName = 'Classroom1';
   static const String serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
   static const String characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+  
+  static const platform = MethodChannel('phone_service');
   
   bool _isConnected = false;
   Function(bool)? onConnectionChanged;
@@ -16,7 +19,15 @@ class BluetoothService {
   Timer? _monitoringTimer;
   BluetoothCharacteristic? _writeCharacteristic;
   
-  BluetoothService();
+  BluetoothService() {
+    // Listen for native vibration triggers (BLE Fallback)
+    platform.setMethodCallHandler((call) async {
+      if (call.method == 'vibrateESP32') {
+        print('Native triggered vibrateESP32! Sending BLE command...');
+        await vibrateESP32Hardware();
+      }
+    });
+  }
   
   Future<bool> connect() async {
     try {
@@ -48,8 +59,6 @@ class BluetoothService {
               // Find characteristic for admin commands
               var services = await _device!.discoverServices();
               for (var service in services) {
-                // Not using exact string match for custom service from flutter_blue_plus mapping, 
-                // UUID formatting might slight differ, check canonical UUID
                 if (service.uuid.toString().toLowerCase() == serviceUuid.toLowerCase()) {
                   for (var characteristic in service.characteristics) {
                     if (characteristic.uuid.toString().toLowerCase() == characteristicUuid.toLowerCase()) {
@@ -122,6 +131,17 @@ class BluetoothService {
       return false;
     }
   }
+
+  Future<void> vibrateESP32Hardware() async {
+    if (_isConnected && _writeCharacteristic != null) {
+      try {
+        await _writeCharacteristic!.write(utf8.encode("VIBRATE"), withoutResponse: false);
+      } catch (e) {
+        print('Error sending VIBRATE to ESP32: $e');
+      }
+    }
+  }
+
   Future<List<String>> getConnectedClients() async {
     if (!_isConnected || _writeCharacteristic == null) {
       if (!await connect()) return [];
@@ -139,7 +159,6 @@ class BluetoothService {
         if (str == "NONE") {
           if (!completer.isCompleted) completer.complete([]);
         } else if (str.isNotEmpty && str.contains(":")) {
-          // ensure it's a MAC address list
           if (!completer.isCompleted) completer.complete(str.split(',').where((s) => s.trim().isNotEmpty).toList());
         }
       });
@@ -159,10 +178,7 @@ class BluetoothService {
     }
   }
   
-  void startMonitoring() {
-    // Monitoring is handled by the connection state stream.
-    // Periodic polling is unnecessary and causes spammy snackbars.
-  }
+  void startMonitoring() {}
   
   Future<void> loadAndConnect() async {
     if (_isConnected) {

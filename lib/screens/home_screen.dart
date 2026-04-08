@@ -48,57 +48,66 @@ class _HomeScreenState extends State<HomeScreen> {
   
   void _initializeBluetooth() {
     _bluetoothService.onConnectionChanged = (connected) {
-      setState(() {
-        _isConnected = connected;
-        _isScanning = false; // No scanning with native approach
-      });
-      
-      if (connected) {
-        // Request essential permissions for Mode Shifting logic
-        [Permission.phone].request().then((_) {
-          PhoneService.ensureDndAccess().then((granted) {
-            if (granted) {
-              PhoneService.enableClassroomMode();
-            }
-            _checkSilentMode();
-          });
-        });
-        _showNotification('Connected to Classroom1', 'Classroom mode enabled (Force-Toggle)');
-      } else {
-        PhoneService.disableClassroomMode();
-        _checkSilentMode();
-        _showNotification('Disconnected', 'Classroom mode disabled');
-      }
-    };
-    
-    // Start monitoring connection
-    _bluetoothService.startMonitoring();
-    
-    // Try to connect
-    _bluetoothService.loadAndConnect();
-    
-    // Check initial connection status
-    _bluetoothService.checkConnection().then((connected) {
+      if (!mounted) return;
       setState(() {
         _isConnected = connected;
         _isScanning = false;
       });
-    });
+      
+      if (connected) {
+        _handleClassroomModeEnable();
+      } else {
+        _handleClassroomModeDisable();
+      }
+    };
+    
+    _bluetoothService.loadAndConnect();
+  }
+  
+  Future<void> _handleClassroomModeEnable() async {
+    _showNotification('Connected', 'Initializing Classroom Mode...');
+    
+    // 1. Request Role & Permissions
+    // This is required for CallScreeningService to work
+    final permissionsGranted = await PhoneService.ensurePermissions();
+    if (!permissionsGranted) {
+       _showNotification('Action Required', 'Please grant DND and Contacts access.');
+    }
+
+    // 2. Request Call Screening Role (Android 10+)
+    await PhoneService.requestCallScreeningRole();
+
+    // 3. Enable Logic
+    final success = await PhoneService.enableClassroomMode();
+    if (success) {
+      _showNotification('Active', 'Classroom Mode enabled (Safe-Screening)');
+    }
+    _checkSilentMode();
+  }
+
+  Future<void> _handleClassroomModeDisable() async {
+    await PhoneService.disableClassroomMode();
+    _checkSilentMode();
+    _showNotification('Disconnected', 'Classroom Mode disabled');
   }
   
   Future<void> _checkSilentMode() async {
     final isSilent = await PhoneService.isClassroomModeEnabled();
-    setState(() {
-      _isSilentMode = isSilent;
-    });
+    if (mounted) {
+      setState(() {
+        _isSilentMode = isSilent;
+      });
+    }
   }
   
   void _showNotification(String title, String message) {
     HapticFeedback.lightImpact();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$title: $message'),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         backgroundColor: _isConnected ? Colors.green : Colors.orange,
       ),
     );

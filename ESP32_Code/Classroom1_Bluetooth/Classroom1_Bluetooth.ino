@@ -7,8 +7,12 @@
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
+#define VIBRATOR_PIN        13 // Typical GPIO for vibrator/buzzer
+
 BLEServer* pServer = NULL;
 int clientsConnected = 0;
+bool isVibrating = false;
+unsigned long vibrationEndTime = 0;
 
 struct ClientInfo {
   uint16_t conn_id;
@@ -55,7 +59,13 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         Serial.print("Received: ");
         Serial.println(msg);
         
-        if (msg.indexOf("DISCONNECT_ALL") >= 0) {
+        if (msg.indexOf("VIBRATE") >= 0) {
+           Serial.println("EMERGENCY ALERT: Triggering Hardware Vibration!");
+           isVibrating = true;
+           vibrationEndTime = millis() + 3000; // Vibrate for 3 seconds
+           digitalWrite(VIBRATOR_PIN, HIGH);
+        }
+        else if (msg.indexOf("DISCONNECT_ALL") >= 0) {
           Serial.println("Admin requested DISCONNECT_ALL. Dropping all client connections...");
           for (int i = 0; i < connectedClients.size(); i++) {
             pServer->disconnect(connectedClients[i].conn_id);
@@ -93,6 +103,8 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(VIBRATOR_PIN, OUTPUT);
+  digitalWrite(VIBRATOR_PIN, LOW);
   delay(1000);
   Serial.println("=================================");
   Serial.println("ESP32 BLE Classroom Server");
@@ -126,5 +138,10 @@ void setup() {
 }
 
 void loop() {
-  delay(2000);
+  if (isVibrating && millis() > vibrationEndTime) {
+    isVibrating = false;
+    digitalWrite(VIBRATOR_PIN, LOW);
+    Serial.println("Hardware Alert Finished.");
+  }
+  delay(10);
 }

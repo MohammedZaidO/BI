@@ -5,21 +5,35 @@ class PhoneService {
   
   static bool _isClassroomModeEnabled = false;
   
-  /// Opens system settings screen if DND access isn't granted yet.
-  static Future<bool> ensureDndAccess() async {
+  /// Consolidated permissions for Classroom Mode:
+  /// 1. DND Access (for silencing)
+  /// 2. READ_CONTACTS (for screening service to see phonebook)
+  /// 3. POST_NOTIFICATIONS (for the Emergency Alert shout)
+  static Future<bool> ensurePermissions() async {
     try {
-      final result = await _channel.invokeMethod('ensureDndAccess');
+      final result = await _channel.invokeMethod('ensurePermissions');
       return result == true;
     } catch (e) {
-      print('Error ensuring DND access: $e');
+      print('Error ensuring permissions: $e');
+      return false;
+    }
+  }
+
+  /// Triggers the system prompt to set this app as the "Call Screening Provider".
+  /// Required for the CallHandlerService to intercept calls.
+  static Future<bool> requestCallScreeningRole() async {
+    try {
+      final result = await _channel.invokeMethod('requestCallScreeningRole');
+      return result == true;
+    } catch (e) {
+      print('Error requesting call screening role: $e');
       return false;
     }
   }
   
-  /// Enables Priority DND (required for: only emergency/starred contacts ring).
   static Future<bool> enableClassroomMode() async {
     try {
-      final result = await _channel.invokeMethod('enablePriorityDnd');
+      final result = await _channel.invokeMethod('enableClassroomMode');
       _isClassroomModeEnabled = result == true;
       return _isClassroomModeEnabled;
     } catch (e) {
@@ -30,7 +44,7 @@ class PhoneService {
   
   static Future<bool> disableClassroomMode() async {
     try {
-      final result = await _channel.invokeMethod('disableDnd');
+      final result = await _channel.invokeMethod('disableClassroomMode');
       _isClassroomModeEnabled = false;
       return result == true;
     } catch (e) {
@@ -41,7 +55,7 @@ class PhoneService {
   
   static Future<bool> isClassroomModeEnabled() async {
     try {
-      final result = await _channel.invokeMethod('isPriorityDndEnabled');
+      final result = await _channel.invokeMethod('isClassroomModeEnabled');
       _isClassroomModeEnabled = result == true;
       return _isClassroomModeEnabled;
     } catch (e) {
