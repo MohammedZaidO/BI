@@ -123,6 +123,8 @@ class _HomeScreenState extends State<HomeScreen> {
   
   @override
   void dispose() {
+    _bluetoothService.onConnectionChanged = null;
+    PhoneService.disableClassroomMode(); // Safety reset
     _bluetoothService.dispose();
     super.dispose();
   }

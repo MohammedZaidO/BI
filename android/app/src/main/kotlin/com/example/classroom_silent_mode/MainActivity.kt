@@ -24,55 +24,68 @@ import android.telephony.TelephonyManager
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "phone_service"
     private lateinit var audioManager: AudioManager
+    private var vibrator: Vibrator? = null
+    private var originalRingerMode: Int = -1
 
     companion object {
         var isClassroomModeGlobal = false
     }
 
     private val callReceiver = object : BroadcastReceiver() {
-        private var vibrator: Vibrator? = null
-
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == TelephonyManager.ACTION_PHONE_STATE_CHANGED) {
                 val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
                 val incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
                 
-                if (state == TelephonyManager.EXTRA_STATE_RINGING && isClassroomModeGlobal && !incomingNumber.isNullOrEmpty()) {
-                    val sharedPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    val jsonStr = sharedPrefs.getString("flutter.emergency_contacts", "[]")
-                    
-                    if (jsonStr != null && jsonStr != "[]") {
-                        val incClean = incomingNumber.replace(Regex("\\D"), "")
-                        var isMatch = false
-                        try {
-                            val arr = org.json.JSONArray(jsonStr)
-                            for (i in 0 until arr.length()) {
-                                val obj = arr.getJSONObject(i)
-                                val savedNum = obj.getString("phoneNumber").replace(Regex("\\D"), "")
-                                if (savedNum.isNotEmpty() && (incClean.endsWith(savedNum) || savedNum.endsWith(incClean))) {
-                                    isMatch = true
-                                    break
+                if (state == TelephonyManager.EXTRA_STATE_RINGING && isClassroomModeGlobal) {
+                    // Even if number is null (API 29+ restrictions), we fallback to vibrator only for matched contacts
+                    // In a future update, we can add CallLog lookup if needed.
+                    if (!incomingNumber.isNullOrEmpty()) {
+                        val sharedPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                        val jsonStr = sharedPrefs.getString("flutter.emergency_contacts", "[]")
+                        
+                        if (jsonStr != null && jsonStr != "[]") {
+                            val incClean = incomingNumber.replace(Regex("\\D"), "")
+                            var isMatch = false
+                            try {
+                                val arr = org.json.JSONArray(jsonStr)
+                                for (i in 0 until arr.length()) {
+                                    val obj = arr.getJSONObject(i)
+                                    val savedNum = obj.getString("phoneNumber").replace(Regex("\\D"), "")
+                                    if (savedNum.isNotEmpty() && (incClean.endsWith(savedNum) || savedNum.endsWith(incClean))) {
+                                        isMatch = true
+                                        break
+                                    }
                                 }
-                            }
-                        } catch(e: Exception) {
-                            e.printStackTrace()
-                        }
+                            } catch(e: Exception) { }
 
-                        if (isMatch) {
-                            vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                            val pattern = longArrayOf(0, 1000, 1000)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-                            } else {
-                                vibrator?.vibrate(pattern, 0)
+                            if (isMatch) {
+                                startEmergencyVibration(context)
                             }
                         }
                     }
                 } else if (state == TelephonyManager.EXTRA_STATE_IDLE || state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
-                    vibrator?.cancel()
+                    stopVibration()
                 }
             }
         }
+    }
+
+    private fun startEmergencyVibration(context: Context) {
+        if (vibrator == null) {
+            vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+        val pattern = longArrayOf(0, 1000, 1000, 1000, 1000) // Pulse pattern
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(pattern, 0)
+        }
+    }
+
+    private fun stopVibration() {
+        vibrator?.cancel()
     }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
@@ -80,10 +93,11 @@ class MainActivity: FlutterActivity() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
         try {
+            val filter = IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
             if (Build.VERSION.SDK_INT >= 33) {
-                registerReceiver(callReceiver, IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED), Context.RECEIVER_EXPORTED)
+                registerReceiver(callReceiver, filter, Context.RECEIVER_EXPORTED)
             } else {
-                registerReceiver(callReceiver, IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED))
+                registerReceiver(callReceiver, filter)
             }
         } catch (e: Exception) { }
         
@@ -113,30 +127,43 @@ class MainActivity: FlutterActivity() {
         if (!nm.isNotificationPolicyAccessGranted) return false
         
         try {
+            // Save current mode to restore later
+            originalRingerMode = audioManager.ringerMode
+            
+            // Set to TOTAL SILENCE (no vibration from system)
+            audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                audioManager.ringerMode = AudioManager.RINGER_MODE_VIBRATE
-                val categories = Policy.PRIORITY_CATEGORY_CALLS or Policy.PRIORITY_CATEGORY_REPEAT_CALLERS
-                val callSenders = Policy.PRIORITY_SENDERS_STARRED
-                val messageSenders = Policy.PRIORITY_SENDERS_STARRED
-                nm.notificationPolicy = Policy(categories, callSenders, messageSenders, 0)
-                nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
-                isClassroomModeGlobal = true
-            }
-        } catch (_: Exception) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Strict policy: Allow nothing through system-wise. 
+                // We will handle the vibration manually in callReceiver.
+                val categories = 0 // No priority categories allowed
+                nm.notificationPolicy = Policy(categories, Policy.PRIORITY_SENDERS_NONE, Policy.PRIORITY_SENDERS_NONE)
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
+            isClassroomModeGlobal = true
+            return true
+        } catch (e: Exception) {
+            return false
         }
-        return true
     }
 
     private fun disableDnd(): Boolean {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (!nm.isNotificationPolicyAccessGranted) return false
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
         }
+        
+        // Restore ringer mode
+        if (originalRingerMode != -1) {
+            audioManager.ringerMode = originalRingerMode
+        } else {
+            audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
+        }
+        
         isClassroomModeGlobal = false
+        stopVibration()
         return true
     }
 
@@ -147,6 +174,8 @@ class MainActivity: FlutterActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isClassroomModeGlobal = false
+        stopVibration()
         try {
             unregisterReceiver(callReceiver)
         } catch(e: Exception) {}
