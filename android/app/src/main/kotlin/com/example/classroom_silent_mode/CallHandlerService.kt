@@ -43,7 +43,8 @@ class CallHandlerService : CallScreeningService() {
         }
 
         val response = responseBuilder.build()
-        Log.d(TAG, "EVIDENCE: response flags disallow=${response.shouldDisallowCall} reject=${response.shouldRejectCall} skipLog=${response.shouldSkipCallLog} skipNotification=${response.shouldSkipNotification} silence=${response.shouldSilenceCall}")
+        // Log the variables used for the build since the builder doesn't expose them after construction
+        Log.d(TAG, "EVIDENCE: response flags disallow=false reject=false skipLog=false skipNotification=false silence=$isModeEnabled")
         
         Log.d(TAG, "EVIDENCE: respondToCall executed")
         respondToCall(callDetails, response)
