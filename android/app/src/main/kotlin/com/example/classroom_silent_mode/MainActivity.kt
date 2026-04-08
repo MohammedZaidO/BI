@@ -137,7 +137,7 @@ class MainActivity: FlutterActivity() {
                 // Strict policy: Allow nothing through system-wise. 
                 // We will handle the vibration manually in callReceiver.
                 val categories = 0 // No priority categories allowed
-                nm.notificationPolicy = Policy(categories, Policy.PRIORITY_SENDERS_NONE, Policy.PRIORITY_SENDERS_NONE)
+                nm.notificationPolicy = Policy(categories, Policy.PRIORITY_SENDERS_STARRED, Policy.PRIORITY_SENDERS_STARRED)
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
             }
             isClassroomModeGlobal = true
