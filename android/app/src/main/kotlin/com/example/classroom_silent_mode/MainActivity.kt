@@ -1,5 +1,5 @@
 package com.example.classroom_silent_mode
-
+import android.util.Log
 import android.Manifest
 import android.app.NotificationManager
 import android.app.NotificationManager.Policy

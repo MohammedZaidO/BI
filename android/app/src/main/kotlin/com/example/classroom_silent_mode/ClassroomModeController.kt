@@ -36,8 +36,8 @@ class ClassroomModeController(private val context: Context) {
                 // Block EVERYTHING else (no calls, no messages).
                 // Our "Notification Shout" is a separate high-priority event.
                 val categories = 0 // No categories allowed (Silence everyone)
-                val callSenders = Policy.PRIORITY_SENDERS_NONE
-                val msgSenders = Policy.PRIORITY_SENDERS_NONE
+                val callSenders = Policy.PRIORITY_SENDERS_STARRED
+                val msgSenders = Policy.PRIORITY_SENDERS_STARRED
                 notificationManager.notificationPolicy = Policy(categories, callSenders, msgSenders)
                 
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
