@@ -14,7 +14,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final BluetoothService _bluetoothService = BluetoothService();
   bool _isConnected = false;
   bool _isScanning = false;
@@ -24,11 +24,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeBluetooth();
     _checkSilentMode();
     _loadEsp32MacAddress();
     _loadContacts();
     ContactsService.syncAllToSystem();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-trigger the enable flow if connected, to pick up newly granted permissions
+      if (_isConnected) {
+        _handleClassroomModeEnable();
+      } else {
+        _checkSilentMode();
+      }
+    }
   }
   
   void _loadContacts() async {
@@ -42,13 +55,15 @@ class _HomeScreenState extends State<HomeScreen> {
   
   void _loadEsp32MacAddress() {
     // Load saved MAC address if available
-    // User can set this after getting it from ESP32 Serial Monitor
-    // For now, we'll try without it first
   }
   
   void _initializeBluetooth() {
     _bluetoothService.onConnectionChanged = (connected) {
       if (!mounted) return;
+      
+      // LOG: ESP32_CONNECTED event handled
+      print('DEBUG: ESP32_CONNECTED=$connected');
+
       setState(() {
         _isConnected = connected;
         _isScanning = false;
@@ -67,16 +82,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleClassroomModeEnable() async {
     _showNotification('Connected', 'Initializing Classroom Mode...');
     
-    // 1. Request Permissions for detection layer
+    // 1. Request Permissions and Settings
     final permissionsGranted = await PhoneService.ensurePermissions();
-    if (!permissionsGranted) {
-       _showNotification('Action Required', 'Please grant DND and Call Log access.');
-    }
-
-    // 2. Enable Logic
-    final success = await PhoneService.enableClassroomMode();
-    if (success) {
-      _showNotification('Active', 'Classroom Mode enabled (Safe-Screening)');
+    
+    // 2. Enable Logic (Only proceeds if permissions are granted)
+    if (permissionsGranted) {
+      final success = await PhoneService.enableClassroomMode();
+      if (success) {
+        _showNotification('Active', 'Classroom Mode enabled (Safe-Screening)');
+      }
+    } else {
+       _showNotification('Action Required', 'DND access is required to mute calls.');
     }
     _checkSilentMode();
   }
@@ -132,8 +148,9 @@ class _HomeScreenState extends State<HomeScreen> {
   
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _bluetoothService.onConnectionChanged = null;
-    PhoneService.disableClassroomMode(); // Safety reset
+    PhoneService.disableClassroomMode(); 
     _bluetoothService.dispose();
     super.dispose();
   }

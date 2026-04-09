@@ -62,9 +62,20 @@ class MainActivity: FlutterActivity() {
      * Handles permissions for the 'Best-Effort' detection layer.
      */
     private fun ensurePermissions(): Boolean {
+        Log.d("MainActivity", "CLASSROOM_ENABLE_REQUESTED")
+        
         // 1. DND Access (Required for Base Silence)
-        if (!modeController.enableClassroomMode()) { 
-             // Handled by controller/activity result
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!notificationManager.isNotificationPolicyAccessGranted) {
+                Log.d("MainActivity", "DND_ACCESS_GRANTED=false")
+                Log.d("MainActivity", "OPENING_DND_SETTINGS")
+                val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                startActivity(intent)
+                return false
+            } else {
+                Log.d("MainActivity", "DND_ACCESS_GRANTED=true")
+            }
         }
 
         // 2. Best-Effort Detection Permissions

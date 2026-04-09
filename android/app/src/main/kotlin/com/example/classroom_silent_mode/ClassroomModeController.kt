@@ -34,21 +34,18 @@ class ClassroomModeController(private val context: Context) {
      */
     fun enableClassroomMode(): Boolean {
         if (!notificationManager.isNotificationPolicyAccessGranted) {
-            Log.e(TAG, "DND Access not granted. Cannot enable Classroom Mode.")
+            Log.e(TAG, "DND_APPLY_SUCCESS=false (No Permission)")
             return false
         }
 
         try {
-            // Save current state for safe restoration later
             originalRingerMode = audioManager.ringerMode
             
-            // 1. BASE STATE: STRICT DND (Total Silence)
-            // Using NONE ensures the system handles the heavy lifting of call muting.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
+                Log.d(TAG, "DND_APPLY_SUCCESS=true")
             }
             
-            // 2. Auxiliary: Set Ringer to Silent for extra local enforcement
             audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
             
             // Persist State for background Receiver
@@ -56,10 +53,10 @@ class ClassroomModeController(private val context: Context) {
             prefs.edit().putBoolean(KEY_MODE, true).apply()
             
             isEnabledGlobal = true
-            Log.d(TAG, "CLASSROOM_MODE_ON: Total Silence active.")
+            Log.d(TAG, "CLASSROOM_MODE_SET_ON")
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error enabling Classroom Mode", e)
+            Log.e(TAG, "DND_APPLY_SUCCESS=false", e)
             return false
         }
     }
@@ -68,15 +65,11 @@ class ClassroomModeController(private val context: Context) {
      * Disables Classroom Mode: Restoring Previous State.
      */
     fun disableClassroomMode(): Boolean {
-        if (!notificationManager.isNotificationPolicyAccessGranted) return false
-        
         try {
-            // 1. Restore DND Filter
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notificationManager.isNotificationPolicyAccessGranted) {
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
             }
             
-            // 2. Restore Ringer Mode
             if (originalRingerMode != -1) {
                 audioManager.ringerMode = originalRingerMode
             } else {
@@ -88,7 +81,7 @@ class ClassroomModeController(private val context: Context) {
             prefs.edit().putBoolean(KEY_MODE, false).apply()
 
             isEnabledGlobal = false
-            Log.d(TAG, "CLASSROOM_MODE_OFF: Settings restored.")
+            Log.d(TAG, "CLASSROOM_MODE_SET_OFF")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error disabling Classroom Mode", e)
