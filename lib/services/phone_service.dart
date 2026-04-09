@@ -18,18 +18,6 @@ class PhoneService {
       return false;
     }
   }
-
-  /// Triggers the system prompt to set this app as the "Call Screening Provider".
-  /// Required for the CallHandlerService to intercept calls.
-  static Future<bool> requestCallScreeningRole() async {
-    try {
-      final result = await _channel.invokeMethod('requestCallScreeningRole');
-      return result == true;
-    } catch (e) {
-      print('Error requesting call screening role: $e');
-      return false;
-    }
-  }
   
   static Future<bool> enableClassroomMode() async {
     try {

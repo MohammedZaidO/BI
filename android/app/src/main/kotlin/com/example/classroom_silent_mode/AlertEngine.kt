@@ -11,6 +11,12 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 
+/**
+ * AlertEngine: Manages the 'Hardware-First' alerting pipeline.
+ * Reliability Model:
+ * 1. ESP32 Trigger: GUARANTEED (Hardware-level vibrator)
+ * 2. Phone Alerts: DEVICE-DEPENDENT (Best-Effort)
+ */
 class AlertEngine(private val context: Context) {
     private val TAG = "AlertEngine"
     private val NOTIF_CHANNEL_ID = "emergency_priority"
@@ -25,32 +31,38 @@ class AlertEngine(private val context: Context) {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Emergency Call Alerts"
-            val descriptionText = "Vibrates when a favourite contact calls during classroom mode"
+            val descriptionText = "Secondary phone alert for favourite contacts. Note: Best-effort only."
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(NOTIF_CHANNEL_ID, name, importance).apply {
                 description = descriptionText
                 enableVibration(true)
-                // Distinct double-pulse pattern
                 vibrationPattern = longArrayOf(0, 800, 200, 800, 200, 800)
-                setSound(null, null) // Silent but vibrating
+                setSound(null, null) 
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                // Attempt to bypass DND (Device-Dependent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    setAllowBubbles(true)
+                }
             }
             notificationManager.createNotificationChannel(channel)
         }
     }
 
     fun triggerEmergencyAlert(incomingNumber: String?) {
-        Log.d(TAG, "Triggering Emergency Alert for: $incomingNumber")
+        Log.d(TAG, "Triggering Alert Sequence for: $incomingNumber")
 
-        // 1. PHONE SHOUT: High-priority notification
+        // === 1. GUARANTEED PATH: ESP32 Hardware ===
+        Log.d(TAG, "PIPELINE: Triggering ESP32 Alert (Guaranteed Path)")
+        MainActivity.triggerESP32Vibration()
+
+        // === 2. BEST-EFFORT PATH: Phone Notifications ===
+        // Note: Strict DND (InterruptionFilter.NONE) will likely suppress this vibration.
+        Log.d(TAG, "PIPELINE: Triggering Phone Notification (Best-Effort Path)")
         showNotification(incomingNumber ?: "Emergency Contact")
 
-        // 2. MANUAL MOTOR KICK (Auxiliary)
+        // === 3. AUXILIARY: Manual Motor Kick ===
+        Log.d(TAG, "PIPELINE: Triggering Manual Vibration Kick (Device-Dependent)")
         startManualVibration()
-
-        // 3. BLE FALLBACK: Tell Flutter/ESP32 to vibrate
-        // This is handled by MainActivity via a listener
-        MainActivity.triggerESP32Vibration()
     }
 
     private fun showNotification(contactInfo: String) {
@@ -63,7 +75,7 @@ class AlertEngine(private val context: Context) {
 
         val notification = builder
             .setContentTitle("Emergency Call!")
-            .setContentText("Incoming call from: $contactInfo")
+            .setContentText("Incoming: $contactInfo")
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setPriority(Notification.PRIORITY_MAX)
             .setCategory(Notification.CATEGORY_CALL)
@@ -71,13 +83,11 @@ class AlertEngine(private val context: Context) {
             .build()
             
         notificationManager.notify(NOTIF_ID, notification)
-        Log.d(TAG, "NOTIFICATION_SHOUT_FIRED: Emergency Alert Notification posted.")
     }
 
     fun cancelAlert() {
         notificationManager.cancel(NOTIF_ID)
         stopManualVibration()
-        Log.d(TAG, "Emergency Alert cancelled.")
     }
 
     private fun startManualVibration() {

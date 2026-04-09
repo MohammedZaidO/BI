@@ -67,17 +67,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleClassroomModeEnable() async {
     _showNotification('Connected', 'Initializing Classroom Mode...');
     
-    // 1. Request Role & Permissions
-    // This is required for CallScreeningService to work
+    // 1. Request Permissions for detection layer
     final permissionsGranted = await PhoneService.ensurePermissions();
     if (!permissionsGranted) {
-       _showNotification('Action Required', 'Please grant DND and Contacts access.');
+       _showNotification('Action Required', 'Please grant DND and Call Log access.');
     }
 
-    // 2. Request Call Screening Role (Android 10+)
-    await PhoneService.requestCallScreeningRole();
-
-    // 3. Enable Logic
+    // 2. Enable Logic
     final success = await PhoneService.enableClassroomMode();
     if (success) {
       _showNotification('Active', 'Classroom Mode enabled (Safe-Screening)');

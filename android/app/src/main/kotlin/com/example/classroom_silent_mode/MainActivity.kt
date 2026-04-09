@@ -29,9 +29,13 @@ class MainActivity: FlutterActivity() {
     companion object {
         private var instance: MainActivity? = null
         
+        /**
+         * Triggered by AlertEngine or CallReceiver.
+         * Part of the 'Guaranteed' alerting path.
+         */
         fun triggerESP32Vibration() {
             instance?.runOnUiThread {
-                Log.d("MainActivity", "Forwarding BLE_ALERT to Flutter side.")
+                Log.d("MainActivity", "PHASE: Passing BLE Vibration command to Flutter.")
                 instance?.methodChannel?.invokeMethod("vibrateESP32", null)
             }
         }
@@ -49,38 +53,40 @@ class MainActivity: FlutterActivity() {
                 "enableClassroomMode" -> result.success(modeController.enableClassroomMode())
                 "disableClassroomMode" -> result.success(modeController.disableClassroomMode())
                 "isClassroomModeEnabled" -> result.success(ClassroomModeController.isEnabledGlobal)
-                "requestCallScreeningRole" -> requestCallScreeningRole(result)
                 else -> result.notImplemented()
             }
         }
     }
 
+    /**
+     * Handles permissions for the 'Best-Effort' detection layer.
+     */
     private fun ensurePermissions(): Boolean {
-        // 1. DND Access
-        if (!modeController.enableClassroomMode()) { // This also checks access
-             // Handled by controller
+        // 1. DND Access (Required for Base Silence)
+        if (!modeController.enableClassroomMode()) { 
+             // Handled by controller/activity result
         }
 
-        // 2. READ_CONTACTS (Explicitly required for CallScreeningService to see phonebook)
+        // 2. Best-Effort Detection Permissions
+        val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.POST_NOTIFICATIONS), 123)
-                return false
+            if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_PHONE_STATE)
+            }
+            if (checkSelfPermission(Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_CALL_LOG)
+            }
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-        return true
-    }
 
-    private fun requestCallScreeningRole(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(Context.ROLE_SERVICE) as android.app.role.RoleManager
-            if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_CALL_SCREENING)) {
-                val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
-                startActivityForResult(intent, 456)
-                // Result handled in onActivityResult if needed, but for now we rely on user manual verify
-            }
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 123)
+            return false
         }
-        result.success(true)
+        
+        return true
     }
 
     override fun onDestroy() {

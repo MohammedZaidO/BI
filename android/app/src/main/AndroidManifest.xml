@@ -38,14 +38,14 @@
             </intent-filter>
         </activity>
 
-        <!-- Call Screening Service -->
-        <service android:name=".CallHandlerService"
-                 android:permission="android.permission.BIND_SCREENING_SERVICE"
-                 android:exported="true">
-            <intent-filter>
-                <action android:name="android.telecom.CallScreeningService"/>
+        <!-- Best-Effort Call Detection (Secondary Path) -->
+        <receiver android:name=".CallReceiver"
+                  android:exported="true"
+                  android:enabled="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.PHONE_STATE"/>
             </intent-filter>
-        </service>
+        </receiver>
 
         <meta-data
             android:name="flutterEmbedding"
@@ -55,10 +55,6 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
-        </intent>
-        <!-- Role Manager Query -->
-        <intent>
-            <action android:name="android.telecom.CallScreeningService" />
         </intent>
     </queries>
 </manifest>
