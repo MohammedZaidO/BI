@@ -64,13 +64,13 @@
 
         <!-- UI Components for Dialer -->
         <activity android:name=".IncomingCallActivity"
-                  android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
                   android:screenOrientation="portrait"
                   android:showOnLockScreen="true"
                   android:exported="false" />
                   
         <activity android:name=".OngoingCallActivity"
-                  android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
                   android:screenOrientation="portrait"
                   android:showOnLockScreen="true"
                   android:exported="false" />
