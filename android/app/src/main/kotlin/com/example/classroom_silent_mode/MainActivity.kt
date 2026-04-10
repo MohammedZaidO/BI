@@ -59,26 +59,43 @@ class MainActivity: FlutterActivity() {
     }
 
     /**
-     * Handles permissions for the 'Best-Effort' detection layer.
+     * Handles permissions and Dialer Role for the new architecture.
      */
     private fun ensurePermissions(): Boolean {
-        Log.d("MainActivity", "CLASSROOM_ENABLE_REQUESTED")
+        Log.d("MainActivity", "PHASE 1: Dialer Foundation Check")
         
-        // 1. DND Access (Required for Base Silence)
+        // 1. Dialer Role (Mandatory for InCallService)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(Context.ROLE_SERVICE) as android.app.role.RoleManager
+            if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
+                Log.d("MainActivity", "Requesting ROLE_DIALER (Android 10+)")
+                val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER)
+                startActivityForResult(intent, 456)
+                return false
+            }
+        } else {
+            val telecomManager = getSystemService(Context.TELECOM_SERVICE) as android.telecom.TelecomManager
+            if (telecomManager.defaultDialerPackage != packageName) {
+                Log.d("MainActivity", "Requesting Default Dialer (Pre-Android 10)")
+                val intent = Intent(android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                    .putExtra(android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+                startActivity(intent)
+                return false
+            }
+        }
+
+        // 2. DND Access (Required for Base Silence in Phase 2)
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!notificationManager.isNotificationPolicyAccessGranted) {
-                Log.d("MainActivity", "DND_ACCESS_GRANTED=false")
                 Log.d("MainActivity", "OPENING_DND_SETTINGS")
                 val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
                 startActivity(intent)
                 return false
-            } else {
-                Log.d("MainActivity", "DND_ACCESS_GRANTED=true")
             }
         }
 
-        // 2. Best-Effort Detection Permissions
+        // 3. Runtime Permissions
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
@@ -86,6 +103,9 @@ class MainActivity: FlutterActivity() {
             }
             if (checkSelfPermission(Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.READ_CALL_LOG)
+            }
+            if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.CALL_PHONE)
             }
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS)
