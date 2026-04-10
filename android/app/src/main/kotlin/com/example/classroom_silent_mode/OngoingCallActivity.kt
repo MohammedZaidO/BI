@@ -1,17 +1,17 @@
 package com.example.classroom_silent_mode
 
+import android.app.Activity
 import android.os.Bundle
 import android.telephony.PhoneNumberUtils
 import android.telecom.Call
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import java.util.*
 
 /**
  * OngoingCallActivity: Shown during an active call (Telecom.STATE_ACTIVE).
  */
-class OngoingCallActivity : AppCompatActivity() {
+class OngoingCallActivity : Activity() {
 
     private val callback = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) {

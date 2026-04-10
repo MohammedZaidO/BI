@@ -1,16 +1,16 @@
 package com.example.classroom_silent_mode
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.telecom.Call
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 
 /**
  * IncomingCallActivity: Shown when a new call is received (Telecom.STATE_RINGING).
  */
-class IncomingCallActivity : AppCompatActivity() {
+class IncomingCallActivity : Activity() {
 
     private val callback = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) {
