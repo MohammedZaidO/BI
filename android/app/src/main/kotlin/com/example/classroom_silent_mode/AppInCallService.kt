@@ -11,25 +11,37 @@ import android.util.Log
  */
 class AppInCallService : InCallService() {
     private val TAG = "AppInCallService"
+    private lateinit var alertEngine: AlertEngine
+
+    override fun onCreate() {
+        super.onCreate()
+        alertEngine = AlertEngine(this)
+    }
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
-        Log.d(TAG, "onCallAdded: State=${call.state}")
         
+        val details = call.details
+        val incomingNumber = details.handle?.schemeSpecificPart ?: "Unknown"
+        val isClassroomOn = ClassroomModeController.isPersistedEnabled(this)
+        
+        Log.d(TAG, "CLASSROOM_STATE_AT_CALL=${if (isClassroomOn) "ON" else "OFF"}")
+        Log.d(TAG, "CALLER_NUMBER=[MASKED]") // For privacy in logs
+
         CallManager.updateCall(call)
 
-        // Route to the correct UI based on state
+        // Task 1 Logic: ON = Silent, OFF = Ring
+        if (isClassroomOn) {
+            Log.d(TAG, "RING_PATH_SELECTED=silent")
+        } else {
+            Log.d(TAG, "RING_PATH_SELECTED=normal")
+            alertEngine.startNormalRinging()
+        }
+
+        // Route to UI
         when (call.state) {
             Call.STATE_RINGING -> {
-                Log.d(TAG, "Launching IncomingCallActivity")
                 val intent = Intent(this, IncomingCallActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-            }
-            Call.STATE_ACTIVE -> {
-                Log.d(TAG, "Launching OngoingCallActivity")
-                val intent = Intent(this, OngoingCallActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 startActivity(intent)
@@ -40,6 +52,7 @@ class AppInCallService : InCallService() {
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
         Log.d(TAG, "onCallRemoved")
+        alertEngine.stopAllAlerts()
         CallManager.updateCall(null)
     }
 }
