@@ -25,32 +25,37 @@ class EmergencyMatcher(private val context: Context) {
         val normalizedIncoming = normalize(incomingNumber)
         val savedContacts = getSavedEmergencyContacts()
 
-        Log.d(TAG, "Matching Incoming: $incomingNumber (Normalized: $normalizedIncoming)")
+        Log.d(TAG, "RAW_CALLER_NUMBER=$incomingNumber")
+        Log.d(TAG, "NORMALIZED_CALLER_NUMBER=$normalizedIncoming")
 
         for (contact in savedContacts) {
             val normalizedSaved = normalize(contact)
             
-            // 1. Precise Match using Android Utils
+            // 1. Precise Match using Android Native Utils
             if (PhoneNumberUtils.compare(context, incomingNumber, contact)) {
-                Log.d(TAG, "MATCH FOUND (Native Utils): $contact")
+                Log.d(TAG, "EMERGENCY_MATCH=true (Exact Native)")
                 return true
             }
 
-            // 2. Suffix Fallback (Last 7 digits)
-            if (normalizedIncoming.length >= 7 && normalizedSaved.length >= 7) {
-                if (normalizedIncoming.takeLast(7) == normalizedSaved.takeLast(7)) {
-                    Log.d(TAG, "MATCH FOUND (Suffix Fallback): $contact")
+            // 2. Strict 10-Digit Fallback (Requested protection against false positives)
+            if (normalizedIncoming.length >= 10 && normalizedSaved.length >= 10) {
+                if (normalizedIncoming.takeLast(10) == normalizedSaved.takeLast(10)) {
+                    Log.d(TAG, "EMERGENCY_MATCH=true (10-Digit Match)")
                     return true
                 }
+            } else if (normalizedIncoming == normalizedSaved && normalizedIncoming.isNotEmpty()) {
+                // Handle short numbers if they match exactly after normalization
+                Log.d(TAG, "EMERGENCY_MATCH=true (Exact Normalized)")
+                return true
             }
         }
 
-        Log.d(TAG, "No match found for: $incomingNumber")
+        Log.d(TAG, "EMERGENCY_MATCH=false")
         return false
     }
 
     private fun normalize(number: String): String {
-        // Strip everything except digits
+        // Strip everything except digits to handle (123) 456-7890 vs +11234567890 correctly
         return number.replace(Regex("\\D"), "")
     }
 

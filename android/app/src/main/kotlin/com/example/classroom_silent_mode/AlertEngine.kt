@@ -50,8 +50,31 @@ class AlertEngine(private val context: Context) {
         vibrator.cancel()
     }
     
-    // Placeholder for Task 2
+    // Final Implementation for Task 2
     fun startEmergencyAlert() {
-        Log.d(TAG, "PHASE 2: Emergency Alert Placeholder (Task 1 Silent)")
+        Log.d(TAG, "PHASE 2: Starting EMERGENCY Alert Path")
+        
+        // Use the same reliable path for now
+        try {
+            val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            ringtone = RingtoneManager.getRingtone(context, ringtoneUri)
+            ringtone?.play()
+            Log.d(TAG, "RING_STARTED=true")
+        } catch (e: Exception) {
+            Log.e(TAG, "RING_STARTED=false", e)
+        }
+
+        try {
+            val pattern = longArrayOf(0, 500, 200, 500, 200, 500) // More aggressive emergency pattern
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(pattern, 0)
+            }
+            Log.d(TAG, "VIBRATION_STARTED=true")
+        } catch (e: Exception) {
+            Log.e(TAG, "VIBRATION_STARTED=false", e)
+        }
     }
 }

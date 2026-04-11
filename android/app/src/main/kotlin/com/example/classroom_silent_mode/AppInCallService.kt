@@ -23,18 +23,31 @@ class AppInCallService : InCallService() {
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
         
+        val details = call.details
+        val incomingNumber = details.handle?.schemeSpecificPart ?: "Unknown"
         val isClassroomOn = ClassroomModeController.isPersistedEnabled(this)
         
         Log.d(TAG, "CLASSROOM_STATE_AT_CALL=${if (isClassroomOn) "ON" else "OFF"}")
 
         CallManager.updateCall(call)
 
-        // Task 1 Logic: ON = Silent, OFF = Ring
-        if (isClassroomOn) {
-            Log.d(TAG, "RING_PATH_SELECTED=silent")
-        } else {
-            Log.d(TAG, "RING_PATH_SELECTED=normal")
+        // Triple-Path Logic
+        if (!isClassroomOn) {
+            // Path A: Normal Ringing
+            Log.d(TAG, "ALERT_PATH=normal")
             alertEngine.startNormalRinging()
+        } else {
+            // Path B/C: Selective Priority
+            val emergencyMatcher = EmergencyMatcher(this)
+            val isEmergency = emergencyMatcher.isEmergencyMatch(incomingNumber)
+            
+            if (isEmergency) {
+                Log.d(TAG, "ALERT_PATH=emergency")
+                alertEngine.startEmergencyAlert()
+            } else {
+                Log.d(TAG, "ALERT_PATH=silent")
+                // Intentional silence (Dialer-owned)
+            }
         }
 
         // Route to UI
