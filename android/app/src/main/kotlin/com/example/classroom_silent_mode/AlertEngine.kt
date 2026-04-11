@@ -1,8 +1,5 @@
 package com.example.classroom_silent_mode
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.media.Ringtone
 import android.media.RingtoneManager
@@ -16,7 +13,6 @@ import android.util.Log
  */
 class AlertEngine(private val context: Context) {
     private val TAG = "AlertEngine"
-    private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     private var ringtone: Ringtone? = null
 

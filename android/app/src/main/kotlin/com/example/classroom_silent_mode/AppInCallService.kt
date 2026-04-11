@@ -4,10 +4,12 @@ import android.content.Intent
 import android.telecom.Call
 import android.telecom.InCallService
 import android.util.Log
+import com.example.classroom_silent_mode.AlertEngine
+import com.example.classroom_silent_mode.CallManager
+import com.example.classroom_silent_mode.ClassroomModeController
 
 /**
  * AppInCallService: The Android-bindable service for call handling.
- * This service is responsible for receiving the call event from the Telecom framework.
  */
 class AppInCallService : InCallService() {
     private val TAG = "AppInCallService"
@@ -21,12 +23,9 @@ class AppInCallService : InCallService() {
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
         
-        val details = call.details
-        val incomingNumber = details.handle?.schemeSpecificPart ?: "Unknown"
         val isClassroomOn = ClassroomModeController.isPersistedEnabled(this)
         
         Log.d(TAG, "CLASSROOM_STATE_AT_CALL=${if (isClassroomOn) "ON" else "OFF"}")
-        Log.d(TAG, "CALLER_NUMBER=[MASKED]") // For privacy in logs
 
         CallManager.updateCall(call)
 
@@ -39,13 +38,11 @@ class AppInCallService : InCallService() {
         }
 
         // Route to UI
-        when (call.state) {
-            Call.STATE_RINGING -> {
-                val intent = Intent(this, IncomingCallActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
+        if (call.state == Call.STATE_RINGING) {
+            val intent = Intent(this, IncomingCallActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            startActivity(intent)
         }
     }
 
