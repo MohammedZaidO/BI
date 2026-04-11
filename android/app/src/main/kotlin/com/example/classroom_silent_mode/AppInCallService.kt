@@ -27,11 +27,18 @@ class AppInCallService : InCallService() {
         val incomingNumber = details.handle?.schemeSpecificPart ?: "Unknown"
         val isClassroomOn = ClassroomModeController.isPersistedEnabled(this)
         
-        Log.d(TAG, "CLASSROOM_STATE_AT_CALL=${if (isClassroomOn) "ON" else "OFF"}")
+        // Final Log Suite
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val dndFilter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            notificationManager.currentInterruptionFilter
+        } else -1
+        
+        Log.d(TAG, "DND_ACTIVE_AT_CALL=${ if (dndFilter > 1) "true" else "false" } (Filter=$dndFilter)")
+        Log.d(TAG, "CLASSROOM_STATE_AT_CALL=$isClassroomOn")
 
         CallManager.updateCall(call)
 
-        // Triple-Path Logic
+        // Triple-Path Logic (Dialer-Owned)
         if (!isClassroomOn) {
             // Path A: Normal Ringing
             Log.d(TAG, "ALERT_PATH=normal")

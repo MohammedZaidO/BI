@@ -28,60 +28,32 @@ class ClassroomModeController(private val context: Context) {
         }
     }
 
-    /**
-     * Enables Classroom Mode: Strict System Silence.
-     * Guaranteed: The system DND will mute calls on most modern Android devices.
-     */
     fun enableClassroomMode(): Boolean {
-        if (!notificationManager.isNotificationPolicyAccessGranted) {
-            Log.e(TAG, "DND_APPLY_SUCCESS=false (No Permission)")
-            return false
-        }
-
         try {
-            originalRingerMode = audioManager.ringerMode
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
-                Log.d(TAG, "DND_APPLY_SUCCESS=true")
-            }
-            
-            audioManager.ringerMode = AudioManager.RINGER_MODE_SILENT
-            
-            // Persist State for background Receiver
+            // Persist State for Dialer decision logic
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putBoolean(KEY_MODE, true).apply()
             
             isEnabledGlobal = true
-            Log.d(TAG, "CLASSROOM_MODE_SET_ON")
+            Log.d(TAG, "CLASSROOM_MODE_SET_ON (Logical Only)")
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "DND_APPLY_SUCCESS=false", e)
+            Log.e(TAG, "Error enabling Classroom Mode", e)
             return false
         }
     }
 
     /**
-     * Disables Classroom Mode: Restoring Previous State.
+     * Disables Classroom Mode: Restoring logical state.
      */
     fun disableClassroomMode(): Boolean {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notificationManager.isNotificationPolicyAccessGranted) {
-                notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
-            }
-            
-            if (originalRingerMode != -1) {
-                audioManager.ringerMode = originalRingerMode
-            } else {
-                audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
-            }
-            
             // Clear Persist State
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putBoolean(KEY_MODE, false).apply()
-
+ 
             isEnabledGlobal = false
-            Log.d(TAG, "CLASSROOM_MODE_SET_OFF")
+            Log.d(TAG, "CLASSROOM_MODE_SET_OFF (Logical Only)")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error disabling Classroom Mode", e)
