@@ -30,12 +30,12 @@ class MainActivity: FlutterActivity() {
         private var instance: MainActivity? = null
         
         /**
-         * Triggered by AlertEngine or CallReceiver.
-         * Part of the 'Guaranteed' alerting path.
+         * Triggered by AlertEngine when a priority alert is required.
+         * Communicates with the Flutter layer to trigger visual or ESP32-based alerts.
          */
         fun triggerESP32Vibration() {
             instance?.runOnUiThread {
-                Log.d("MainActivity", "PHASE: Passing BLE Vibration command to Flutter.")
+                Log.d("MainActivity", "Bridge: Triggering visual/vibration alert in Flutter layer.")
                 instance?.methodChannel?.invokeMethod("vibrateESP32", null)
             }
         }
@@ -59,10 +59,10 @@ class MainActivity: FlutterActivity() {
     }
 
     /**
-     * Handles permissions and Dialer Role for the new architecture.
+     * Verifies and requests necessary permissions and the Dialer Role.
      */
     private fun ensurePermissions(): Boolean {
-        Log.d("MainActivity", "PHASE 1: Dialer Foundation Check")
+        Log.d("MainActivity", "Verifying Dialer authority and permissions.")
         
         // 1. Dialer Role (Mandatory for InCallService)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

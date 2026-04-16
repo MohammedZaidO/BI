@@ -12,9 +12,9 @@ class EmergencyMatcher(private val context: Context) {
     /**
      * Normalizes and matches an incoming number against saved emergency contacts.
      * Logic:
-     * 1. Normalize both numbers (strip non-digits, handle E.164 if possible).
-     * 2. Compare exact matches.
-     * 3. Fallback to suffix matching (last 7 digits) for international variability.
+     * 1. Normalize both numbers (strip non-digits for consistent comparison).
+     * 2. Compare using Android's native PhoneNumberUtils for precise matching.
+     * 3. Fallback to suffix matching (last 10 digits) to handle formatting variances.
      */
     fun isEmergencyMatch(incomingNumber: String?): Boolean {
         if (incomingNumber.isNullOrBlank()) {

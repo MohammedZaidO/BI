@@ -17,7 +17,7 @@ class AlertEngine(private val context: Context) {
     private var ringtone: Ringtone? = null
 
     fun startNormalRinging() {
-        Log.d(TAG, "PHASE 2: Starting Normal Ringing Path")
+        Log.d(TAG, "Starting standard alert path")
         
         // 1. Trigger Ringtone
         try {
@@ -26,12 +26,12 @@ class AlertEngine(private val context: Context) {
             ringtone?.play()
             Log.d(TAG, "RING_STARTED=true")
         } catch (e: Exception) {
-            Log.e(TAG, "RING_STARTED=false", e)
+            Log.e(TAG, "Ringtone failed to start", e)
         }
 
         // 2. Trigger Vibration
         try {
-            val pattern = longArrayOf(0, 1000, 1000) // 1s vibrate, 1s pause
+            val pattern = longArrayOf(0, 1000, 1000) // Standard pattern
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
             } else {
@@ -40,41 +40,39 @@ class AlertEngine(private val context: Context) {
             }
             Log.d(TAG, "VIBRATION_STARTED=true")
         } catch (e: Exception) {
-            Log.e(TAG, "VIBRATION_STARTED=false", e)
+            Log.e(TAG, "Vibration failed to start", e)
         }
     }
 
     fun stopAllAlerts() {
-        Log.d(TAG, "PHASE 2: Stopping all alerts")
+        Log.d(TAG, "Cleaning up all active alerts")
         ringtone?.stop()
         vibrator.cancel()
     }
     
-    // Final Implementation for Task 2
     fun startEmergencyAlert() {
-        Log.d(TAG, "PHASE 2: Starting EMERGENCY Alert Path")
+        Log.d(TAG, "Starting priority emergency alert path")
         
-        // Use the same reliable path for now
         try {
             val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ringtone = RingtoneManager.getRingtone(context, ringtoneUri)
             ringtone?.play()
-            Log.d(TAG, "RING_STARTED=true")
+            Log.d(TAG, "EMERGENCY_RING_STARTED=true")
         } catch (e: Exception) {
-            Log.e(TAG, "RING_STARTED=false", e)
+            Log.e(TAG, "Emergency ringtone failed", e)
         }
 
         try {
-            val pattern = longArrayOf(0, 500, 200, 500, 200, 500) // More aggressive emergency pattern
+            val pattern = longArrayOf(0, 500, 200, 500, 200, 500) // Priority pattern
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
             } else {
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(pattern, 0)
             }
-            Log.d(TAG, "VIBRATION_STARTED=true")
+            Log.d(TAG, "EMERGENCY_VIBRATE_STARTED=true")
         } catch (e: Exception) {
-            Log.e(TAG, "VIBRATION_STARTED=false", e)
+            Log.e(TAG, "Emergency vibration failed", e)
         }
     }
 }

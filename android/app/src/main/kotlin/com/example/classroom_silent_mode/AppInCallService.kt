@@ -41,22 +41,22 @@ class AppInCallService : InCallService() {
 
         CallManager.updateCall(call)
 
-        // Triple-Path Logic (Dialer-Owned)
+        // Decision logic for incoming calls
         if (!isClassroomOn) {
-            // Path A: Normal Ringing
+            // Path A: Standard alerting when Classroom Mode is disabled
             Log.d(TAG, "ALERT_PATH=normal")
             alertEngine.startNormalRinging()
         } else {
-            // Path B/C: Selective Priority
+            // Selective alerting based on emergency contact matching
             val emergencyMatcher = EmergencyMatcher(this)
             val isEmergency = emergencyMatcher.isEmergencyMatch(incomingNumber)
             
             if (isEmergency) {
-                Log.d(TAG, "ALERT_PATH=emergency")
+                Log.d(TAG, "ALERT_PATH=emergency_alert")
                 alertEngine.startEmergencyAlert()
             } else {
-                Log.d(TAG, "ALERT_PATH=silent")
-                // Intentional silence (Dialer-owned)
+                Log.d(TAG, "ALERT_PATH=silenced")
+                // Intentional silence for non-emergency callers
             }
         }
 
